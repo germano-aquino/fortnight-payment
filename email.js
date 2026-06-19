@@ -27,7 +27,7 @@ async function send(paymentList, negativeIncomeList, period) {
 
   const mailOptions = {
     from: `"Germano Aquino" <${process.env.MAIL_USER}>`,
-    to: [`<${process.env.MAIL_RECIPIENT}>`],
+    to: [`${process.env.MAIL_RECIPIENT}`],
     subject: `Resultados da ${period}`,
     text: mailBody,
   };
