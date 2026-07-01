@@ -5,7 +5,7 @@ function stringToNumber(str) {
 }
 
 function floatToInt(float) {
-  return Math.trunc(100 * float);
+  return Math.round(100 * float);
 }
 
 function stringToInt(str) {
