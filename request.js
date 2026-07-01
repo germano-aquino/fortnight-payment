@@ -1,7 +1,5 @@
 import headers from "./headers.js";
 
-import fs from "node:fs";
-import { parse } from "csv-parse/sync";
 import extracter from "./extracter.js";
 import converter from "./converter.js";
 
