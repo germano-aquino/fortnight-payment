@@ -16,7 +16,7 @@ function nameAndIncome(table) {
 
   const incomes = [];
   for (let i = 1; i <= names.length; i++) {
-    incomes.push(converter.stringToInt(regexIncomes[11 * i - 2][0]));
+    incomes.push(converter.stringToInt(regexIncomes[11 * i - 1][0]));
   }
 
   return [names, incomes];
