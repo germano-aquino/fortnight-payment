@@ -2,7 +2,10 @@ import headers from "./headers.js";
 
 import extracter from "./extracter.js";
 import converter from "./converter.js";
+import { parse } from "csv-parse/sync";
 
+const urlProfessionalsData =
+  "https://www.trinks.com/BackOffice/Download/ExportarProfissionais";
 const urlProfessionalsIncome =
   "https://www.trinks.com/Backoffice/Comissao/ExibirProfissionaisRelatorioComissoes";
 const urlProfessionalsTip =
@@ -30,6 +33,17 @@ const lojaIds = {
     idRelacaoProfissionalRecepcionista: "49101",
   },
 };
+
+const allowedRoleLessPartners = [
+  "germano",
+  "martin",
+  "raiza",
+  "sandra",
+  "sara",
+  "ullyene",
+];
+
+const allowedRoles = ["CLT", "Parceria"];
 
 const today = new Date();
 const day = String(today.getDate());
@@ -81,23 +95,39 @@ function cookieShouldBeSet(response) {
   }
 }
 
-async function getPaymentList() {
-  const paymentList = {
-    14: 0,
-    duque: 0,
-    umarizal: 0,
-    batista: 0,
+async function getPaymentData() {
+  const paymentData = {
+    14: {},
+    duque: {},
+    umarizal: {},
+    batista: {},
   };
-  const negativeIncomeList = {};
 
   for (const store of Object.keys(lojaIds)) {
+    const data = {
+      income: 0,
+      negativeIncome: [],
+      missingRolePartners: [],
+      inactivePartners: [],
+    };
+
     const [names, incomes] = await incomeRequest(store);
+
+    const [missingRolePartners, inactivePartners] = await getPartnersWithError(
+      store,
+      names,
+    );
+    data["missingRolePartners"].push(...missingRolePartners);
+    data["inactivePartners"].push(...inactivePartners);
 
     for (let i = 0; i < names.length; i++) {
       if (incomes[i] < 0) {
-        negativeIncomeList[names[i]] = converter.intToCurrency(incomes[i]);
+        data["negativeIncome"].push({
+          name: names[i],
+          value: converter.intToCurrency(incomes[i]),
+        });
       } else {
-        paymentList[store] += incomes[i];
+        data["income"] += incomes[i];
       }
     }
 
@@ -105,14 +135,79 @@ async function getPaymentList() {
 
     if (tips) {
       for (const tip of tips) {
-        paymentList[store] += tip.Total * 100;
+        data["income"] += tip.Total * 100;
       }
     }
 
-    paymentList[store] = converter.intToCurrency(paymentList[store]);
+    data["income"] = converter.intToCurrency(data["income"]);
+    paymentData[store] = data;
   }
 
-  return [paymentList, negativeIncomeList, period];
+  return [paymentData, period];
+}
+
+async function getPartnersWithError(store, names) {
+  const missingRolePartners = [];
+  const activePartners = [];
+  const inactivePartners = [];
+
+  const csvParsed = await professionalsInfoRequest(store);
+
+  for (const row of csvParsed) {
+    if (allowedRoleLessPartners.includes(row["Apelido"].toLowerCase()))
+      continue;
+
+    activePartners.push(row["Apelido"]);
+    if (!allowedRoles.includes(row["Forma relação profissional"])) {
+      missingRolePartners.push(row["Nome completo"]);
+    }
+  }
+
+  for (const name of names) {
+    if (!activePartners.includes(name)) {
+      inactivePartners.push(name);
+    }
+  }
+
+  return [missingRolePartners, inactivePartners];
+}
+
+async function professionalsInfoRequest(store) {
+  const headers = getHeadersForStore(store);
+
+  const body = {
+    apenasAtivos: true,
+  };
+
+  const encodedBody = new URLSearchParams(body);
+  const response = await fetch(urlProfessionalsData, {
+    method: "POST",
+    headers: {
+      ...headers,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: encodedBody,
+  });
+
+  cookieShouldBeSet(response);
+
+  const responseBody = await response.json();
+
+  const fileUrl = responseBody.UrlDownload;
+
+  const partnersDataResponse = await fetch(fileUrl);
+  const rawData = await partnersDataResponse.arrayBuffer();
+
+  const decoder = new TextDecoder("windows-1252");
+  const csvFile = decoder.decode(rawData);
+
+  const csvParsed = parse(csvFile, {
+    delimiter: ";",
+    columns: true,
+    relax_column_count: true,
+  });
+
+  return csvParsed;
 }
 
 async function incomeRequest(store) {
@@ -172,6 +267,6 @@ async function tipRequest(store) {
   return tipResponseBody?.Dados?.Profissionais;
 }
 
-const request = { getPaymentList };
+const request = { getPaymentData };
 
 export default request;
