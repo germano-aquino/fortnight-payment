@@ -1,21 +1,14 @@
 import nodemailer from "nodemailer";
 
-async function send(paymentList, negativeIncomeList, period) {
-  let mailBody = `Resultados da ${period} do clube depil:\n`;
+const storesName = {
+  14: "14 de Abril",
+  batista: "Batista Campos",
+  duque: "Duque",
+  umarizal: "Umarizal",
+};
 
-  mailBody += `\n\tClube Depil 14 de Abril:\t${paymentList[14]}`;
-  mailBody += `\n\tClube Depil Batista Campos:\t${paymentList["batista"]}`;
-  mailBody += `\n\tClube Depil Umarizal:\t${paymentList["umarizal"]}`;
-  mailBody += `\n\tClube Depil Duque:\t${paymentList["duque"]}`;
-
-  if (!Object.keys(negativeIncomeList)) {
-    mailBody += "\n\nAs seguintes parceiras estão com resultado negativo:";
-    for (const [name, income] of Object.entries(negativeIncomeList)) {
-      mailBody += `\n\t${name}:\t${income}`;
-    }
-  }
-
-  mailBody += "\n\nAtt GermaBot";
+async function send(paymentData, period) {
+  const mailBody = generateMailBody(paymentData, period);
 
   const transporter = nodemailer.createTransport({
     service: process.env.MAIL_SERVICE,
@@ -37,6 +30,41 @@ async function send(paymentList, negativeIncomeList, period) {
     console.log("Email enviado com sucesso!");
     console.log("Message ID:", info.messageId);
   });
+}
+
+function generateMailBody(paymentData, period) {
+  let mailBody = `Relatório da ${period} do clube depil:\n`;
+
+  for (const [store, data] of Object.entries(paymentData)) {
+    mailBody += `\n\tClube Depil ${storesName[store]}`;
+    mailBody += `\n\tPagamento da quinzena:\t${data["income"]}\n`;
+
+    if (data["negativeIncome"].length) {
+      mailBody += `\n\tParceiras com saldo negativo:`;
+      data["negativeIncome"].map(
+        (partner) => (mailBody += `\n\t${partner.name}:\t${partner.value}`),
+      );
+      mailBody += "\n";
+    }
+
+    if (data["missingRolePartners"].length) {
+      mailBody += `\n\tAs seguintes parceiras estão com o campo "Forma relação profissional" vazio no trinks:`;
+      data["missingRolePartners"].map((name) => (mailBody += `\n\t${name}`));
+      mailBody += "\n";
+    }
+
+    if (data["inactivePartners"].length) {
+      mailBody += `\n\tAs seguintes parceiras estão inativas na loja:`;
+      data["inactivePartners"].map((name) => (mailBody += `\n\t${name}`));
+      mailBody += "\n";
+    }
+
+    if (store !== "batista")
+      mailBody += `\n---------------------------------------------------\n`;
+  }
+
+  mailBody += "\nAtt GermaBot";
+  return mailBody;
 }
 
 const email = { send };
