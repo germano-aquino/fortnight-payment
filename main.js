@@ -5,9 +5,8 @@ await main();
 
 async function main() {
   try {
-    const [paymentList, negativeIncomeList, period] =
-      await request.getPaymentList();
-    await email.send(paymentList, negativeIncomeList, period);
+    const [paymentData, period] = await request.getPaymentData();
+    await email.send(paymentData, period);
   } catch (error) {
     console.log("Falha ao gerar lista de pagamentos da quinzena.");
     console.log(error.message);
